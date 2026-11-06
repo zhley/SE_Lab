@@ -1,0 +1,46 @@
+@startuml UML状态图-商品状态转换
+skinparam defaultFontName "Microsoft YaHei"
+
+state "草稿" as Draft
+state "待审核" as Pending
+state "审核驳回" as Rejected
+state "已发布" as Published
+state "交易中" as InTrade
+state "已售出" as Sold
+state "已下架" as Offline
+state "违规下架" as Violation
+
+[*] --> Draft : 卖家新建商品
+Draft --> Pending : 提交审核
+Pending --> Published : 审核通过
+Pending --> Rejected : 审核驳回（须填理由）
+Rejected --> Pending : 修改后重新提交
+Published --> InTrade : 卖家确认预约
+Published --> Offline : 卖家主动下架 / 卖家被封禁
+Published --> Violation : 管理员违规处理（记录原因）
+InTrade --> Sold : 卖家标记交易完成
+InTrade --> Published : 已确认预约被取消
+Offline --> Pending : 卖家重新提交
+Violation --> Pending : 申诉受理（7 天内、仅一次）
+Sold --> [*]
+
+note right of Sold
+  已售出为终态，不允许再转换；
+  买家确认只增加“买家已确认”标记，
+  不改变商品状态。
+end note
+
+note bottom of InTrade
+  交易中不允许卖家修改商品或主动下架；
+  被封禁用户交易中的商品需先终止交易再处理。
+end note
+
+note left of Draft
+  禁止的转换：
+  1) 草稿 / 待审核 → 已发布、交易中、已售出；
+  2) 已售出 → 任意状态；
+  3) 待审核跳过审核 → 交易中。
+  违反时拒绝并提示当前状态。
+end note
+
+@enduml

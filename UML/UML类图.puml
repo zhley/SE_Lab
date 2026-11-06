@@ -1,0 +1,192 @@
+@startuml UML类图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+
+package 用户模块 {
+  class "用户" as User {
+    - userId : String
+    - username : String
+    - phone : String
+    - email : String
+    - passwordHash : String
+    - status : UserStatus
+    - failCount : int
+    - lockUntil : DateTime
+    - buyerRole : boolean
+    - sellerRole : boolean
+    - adminRole : boolean
+    + login(account, password) : Session
+    + lock(minutes) : void
+    + unlock() : void
+    + ban(reason) : void
+    + unban(reason) : void
+  }
+  class "登录会话" as Session {
+    - token : String
+    - role : String
+    - expireAt : DateTime
+  }
+  enum "用户状态" as UserStatus {
+    NORMAL 正常
+    BANNED 已封禁
+  }
+}
+
+package 商品模块 {
+  class "商品" as Item {
+    - itemId : String
+    - title : String
+    - description : String
+    - price : Decimal
+    - status : ItemStatus
+    - version : int
+    - createdAt : DateTime
+    + saveDraft() : void
+    + submitAudit() : boolean
+    + publish() : void
+    + reject(reason) : void
+    + takeOffline() : void
+    + markViolation(reason) : void
+    + restorePublished() : void
+    + changeStatus(target, version) : boolean
+  }
+  class "商品图片" as ItemImage {
+    - imageId : String
+    - url : String
+    - sort : int
+  }
+  class "分类" as Category {
+    - categoryId : String
+    - name : String
+  }
+  enum "商品状态" as ItemStatus {
+    DRAFT 草稿
+    PENDING 待审核
+    PUBLISHED 已发布
+    IN_TRADE 交易中
+    SOLD 已售出
+    OFFLINE 已下架
+    VIOLATION 违规下架
+    REJECTED 审核驳回
+  }
+}
+
+package 预约与交易模块 {
+  class "预约记录" as Reservation {
+    - reservationId : String
+    - status : ReservationStatus
+    - invalidReason : String
+    - createdAt : DateTime
+    + confirm() : boolean
+    + cancel() : boolean
+    + invalidate(reason) : void
+    + reactivate() : boolean
+  }
+  enum "预约状态" as ReservationStatus {
+    PENDING 待确认
+    CONFIRMED 已确认
+    INVALID 已失效
+    CANCELED 已取消
+  }
+  class "交易记录" as Trade {
+    - tradeId : String
+    - status : TradeStatus
+    - completedAt : DateTime
+    - buyerConfirmed : boolean
+    - confirmDeadline : DateTime
+    + complete() : void
+    + confirmByBuyer() : void
+    + autoConfirm() : void
+  }
+  enum "交易状态" as TradeStatus {
+    COMPLETED 已完成
+  }
+}
+
+package 审核与违规模块 {
+  class "审核记录" as AuditRecord {
+    - auditId : String
+    - result : String
+    - reason : String
+    - auditedAt : DateTime
+  }
+  class "违规记录" as ViolationRecord {
+    - violationId : String
+    - reason : String
+    - handledAt : DateTime
+    - appealDeadline : DateTime
+    + canAppeal(now) : boolean
+  }
+  class "申诉记录" as Appeal {
+    - appealId : String
+    - reason : String
+    - status : String
+    - submittedAt : DateTime
+  }
+}
+
+package 日志与通知模块 {
+  class "操作日志" as OperationLog {
+    - logId : String
+    - actionType : String
+    - targetType : String
+    - targetId : String
+    - role : String
+    - result : String
+    - createdAt : DateTime
+  }
+  class "站内通知" as Notification {
+    - noticeId : String
+    - eventType : String
+    - targetType : String
+    - targetId : String
+    - read : boolean
+    - createdAt : DateTime
+  }
+  enum "通知事件" as NoticeType {
+    RESERVATION_CONFIRMED 预约被确认
+    RESERVATION_INVALID 预约失效
+    RESERVATION_CANCELED 预约被取消
+    TRADE_COMPLETED 交易完成
+    AUDIT_RESULT 商品审核结果
+    VIOLATION_HANDLED 违规下架处理结果
+  }
+}
+
+' ---------- 关联关系 ----------
+User "1" -- "0..*" Item : 发布
+Category "1" -- "0..*" Item : 归属
+Item "1" *-- "0..*" ItemImage : 包含
+User "1" -- "0..*" Reservation : 发起
+Item "1" -- "0..*" Reservation : 被预约
+Reservation "0..1" -- "1" Trade : 成交
+Item "1" -- "0..*" AuditRecord : 审核对象
+User "1" -- "0..*" AuditRecord : 审核人
+Item "1" -- "0..*" ViolationRecord : 违规处理
+ViolationRecord "1" -- "0..1" Appeal : 申诉
+User "1" -- "0..*" OperationLog : 操作人
+User "1" -- "0..*" Notification : 接收
+User "1" -- "0..1" Session : 登录
+
+User ..> UserStatus
+Item ..> ItemStatus
+Reservation ..> ReservationStatus
+Trade ..> TradeStatus
+Notification ..> NoticeType
+
+note right of User
+  同一账号可同时是买家与卖家，
+  因此用 buyerRole / sellerRole 标记角色，
+  不拆成买家类与卖家类（避免多继承与身份互斥的误解）；
+  adminRole 只能由系统初始化或后台授予，注册流程不可选。
+end note
+
+note bottom of Item
+  version 为乐观锁版本号：
+  提交预约、确认预约等操作都带上页面读取时的 version，
+  不一致即拒绝，用于实现“旧页面操作”冲突校验。
+end note
+
+@enduml

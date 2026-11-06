@@ -1,0 +1,51 @@
+@startuml UML时序图-预约与确认
+skinparam defaultFontName "Microsoft YaHei"
+autonumber
+
+actor "买家" as Buyer
+participant "买家端页面" as BuyerUI
+participant "预约与交易模块" as TradeSvc
+participant "商品与审核模块" as ItemSvc
+participant "通知模块" as NoticeSvc
+database "业务数据库" as DB
+actor "卖家" as Seller
+participant "卖家端页面" as SellerUI
+
+== 买家发起预约 ==
+Buyer -> BuyerUI : 打开商品详情页
+BuyerUI -> ItemSvc : 查询商品详情(itemId)
+ItemSvc --> BuyerUI : 商品信息 + version
+Buyer -> BuyerUI : 点击“预约”
+BuyerUI -> TradeSvc : 发起预约(itemId, version, buyerId)
+TradeSvc -> ItemSvc : 校验商品状态与卖家身份
+ItemSvc --> TradeSvc : 状态=已发布，卖家≠当前用户
+TradeSvc -> DB : 查询该买家对该商品的有效预约
+DB --> TradeSvc : 不存在有效预约
+TradeSvc -> DB : 写入预约（待确认）
+DB --> TradeSvc : 写入成功
+TradeSvc --> BuyerUI : 预约成功
+BuyerUI --> Buyer : 按钮置为“已预约”
+
+== 卖家确认预约 ==
+Seller -> SellerUI : 打开预约列表并确认
+SellerUI -> TradeSvc : confirm(reservationId, version)
+TradeSvc -> DB : 条件更新商品：已发布→交易中（校验 version）
+alt 更新成功
+  TradeSvc -> DB : 本预约置已确认，其余待确认预约置已失效
+  TradeSvc -> TradeSvc : 生成交易记录
+  TradeSvc -> NoticeSvc : 预约被确认 / 预约失效事件
+  NoticeSvc --> TradeSvc : 通知写入成功
+  TradeSvc --> SellerUI : 确认成功
+  SellerUI --> Seller : 提示商品已进入交易中
+else version 不一致或状态已变化
+  TradeSvc --> SellerUI : 拒绝，返回“商品状态已变化，请刷新”
+  SellerUI --> Seller : 提示刷新页面
+end
+
+note over TradeSvc, DB
+  写入预约、更新商品状态、失效其他预约、
+  生成交易记录与通知均在同一事务内，
+  任一步失败整体回滚，避免出现孤立数据。
+end note
+
+@enduml

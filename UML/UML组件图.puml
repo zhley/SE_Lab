@@ -1,0 +1,68 @@
+@startuml UML组件图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+package "表现层" {
+  component "买家端页面" as BuyerUI
+  component "卖家端页面" as SellerUI
+  component "平台管理后台" as AdminUI
+}
+
+package "应用服务层" {
+  component "用户与权限模块\n注册登录 / 验证码 / 登录锁定 / 角色校验 / 封禁" as UserMod
+  component "商品与审核模块\n草稿 / 提交审核 / 审核 / 上下架 / 违规处理" as ItemMod
+  component "预约与交易模块\n预约 / 确认 / 取消 / 恢复 / 交易完成" as TradeMod
+  component "查询与统计模块\n多条件查询 / 排序分页 / 可见范围 / 统计汇总" as QueryMod
+  component "通知模块\n站内通知 / 未读计数" as NoticeMod
+  component "日志模块\n关键操作记录 / 日志查询" as LogMod
+}
+
+package "数据层" {
+  component "数据访问层\nRepository / 事务控制" as Repo
+  component "文件存储\n商品图片" as FileStore
+  database "业务数据库" as DB
+}
+
+BuyerUI --> UserMod : 注册 / 登录
+BuyerUI --> QueryMod : 浏览与查询商品
+BuyerUI --> TradeMod : 发起 / 取消预约、买家确认
+BuyerUI --> NoticeMod : 查看通知
+
+SellerUI --> UserMod : 登录
+SellerUI --> ItemMod : 草稿 / 提交审核 / 修改 / 下架
+SellerUI --> TradeMod : 确认预约 / 标记交易完成
+SellerUI --> QueryMod : 查询本人商品
+SellerUI --> NoticeMod : 查看通知
+
+AdminUI --> ItemMod : 审核通过或驳回 / 违规下架
+AdminUI --> UserMod : 封禁与解封 / 处理申诉
+AdminUI --> QueryMod : 查询统计
+AdminUI --> LogMod : 查询操作日志
+
+ItemMod --> TradeMod : 状态变更请求（已发布/交易中/已售出）
+ItemMod --> NoticeMod : 审核结果事件
+TradeMod --> NoticeMod : 预约确认 / 失效 / 取消 / 交易完成事件
+ItemMod --> LogMod : 记录关键操作
+TradeMod --> LogMod : 记录关键操作
+UserMod --> LogMod : 记录登录与封禁
+QueryMod --> Repo : 组合条件查询
+ItemMod --> Repo
+TradeMod --> Repo
+LogMod --> Repo
+UserMod --> Repo
+Repo --> DB
+ItemMod --> FileStore : 保存图片
+
+note right of ItemMod
+  商品状态只允许由商品模块修改，
+  预约、交易模块通过接口请求状态变更，
+  避免多处直接写状态导致状态机被绕过。
+end note
+
+note bottom of QueryMod
+  查询模块按角色过滤可见范围：
+  买家仅已发布、卖家本人全部状态、管理员全部状态。
+end note
+
+@enduml
