@@ -42,10 +42,4 @@ else version 不一致或状态已变化
   SellerUI --> Seller : 提示刷新页面
 end
 
-note over TradeSvc, DB
-  写入预约、更新商品状态、失效其他预约、
-  生成交易记录与通知均在同一事务内，
-  任一步失败整体回滚，避免出现孤立数据。
-end note
-
 @enduml

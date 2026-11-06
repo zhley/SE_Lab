@@ -54,15 +54,4 @@ UserMod --> Repo
 Repo --> DB
 ItemMod --> FileStore : 保存图片
 
-note right of ItemMod
-  商品状态只允许由商品模块修改，
-  预约、交易模块通过接口请求状态变更，
-  避免多处直接写状态导致状态机被绕过。
-end note
-
-note bottom of QueryMod
-  查询模块按角色过滤可见范围：
-  买家仅已发布、卖家本人全部状态、管理员全部状态。
-end note
-
 @enduml

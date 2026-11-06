@@ -64,10 +64,4 @@ UC10 ..> UC18 : <<include>>
 UC07 ..> UC11 : <<include>> 重新审核
 UC08 ..> UC11 : <<include>> 重新审核
 
-note right of UC18
-  校验内容：商品当前状态、当前登录用户是否为卖家本人、
-  是否已存在有效预约、页面 version 是否与库中一致。
-  不一致时拒绝并提示刷新（对应 REQ-021）。
-end note
-
 @enduml

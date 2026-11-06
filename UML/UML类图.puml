@@ -176,17 +176,4 @@ Reservation ..> ReservationStatus
 Trade ..> TradeStatus
 Notification ..> NoticeType
 
-note right of User
-  同一账号可同时是买家与卖家，
-  因此用 buyerRole / sellerRole 标记角色，
-  不拆成买家类与卖家类（避免多继承与身份互斥的误解）；
-  adminRole 只能由系统初始化或后台授予，注册流程不可选。
-end note
-
-note bottom of Item
-  version 为乐观锁版本号：
-  提交预约、确认预约等操作都带上页面读取时的 version，
-  不一致即拒绝，用于实现“旧页面操作”冲突校验。
-end note
-
 @enduml

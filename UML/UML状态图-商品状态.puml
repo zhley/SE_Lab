@@ -24,23 +24,4 @@ Offline --> Pending : 卖家重新提交
 Violation --> Pending : 申诉受理（7 天内、仅一次）
 Sold --> [*]
 
-note right of Sold
-  已售出为终态，不允许再转换；
-  买家确认只增加“买家已确认”标记，
-  不改变商品状态。
-end note
-
-note bottom of InTrade
-  交易中不允许卖家修改商品或主动下架；
-  被封禁用户交易中的商品需先终止交易再处理。
-end note
-
-note left of Draft
-  禁止的转换：
-  1) 草稿 / 待审核 → 已发布、交易中、已售出；
-  2) 已售出 → 任意状态；
-  3) 待审核跳过审核 → 交易中。
-  违反时拒绝并提示当前状态。
-end note
-
 @enduml
