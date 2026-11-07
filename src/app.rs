@@ -1116,7 +1116,7 @@ impl App {
             Some(Page::MyItems) => {
                 let mut items: Vec<Item> =
                     self.store.items_of_seller(&user_id).cloned().collect();
-                items.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+                items.sort_by_key(|item| std::cmp::Reverse(item.created_at));
                 PageData::Items(items)
             }
             Some(Page::NewItem) => PageData::Empty,

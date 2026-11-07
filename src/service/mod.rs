@@ -18,10 +18,3 @@ pub mod notice;
 pub mod query;
 pub mod trade;
 pub mod user;
-
-use crate::error::{AppError, Result};
-
-/// 骨架阶段的统一占位实现，实现具体逻辑时替换掉即可。
-pub(crate) fn not_implemented<T>(what: &'static str) -> Result<T> {
-    Err(AppError::NotImplemented(what))
-}

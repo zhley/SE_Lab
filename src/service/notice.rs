@@ -39,7 +39,7 @@ pub fn push(
 /// 列出某用户的全部通知，按时间倒序。
 pub fn list(store: &Store, user_id: &str) -> Result<Vec<Notification>> {
     let mut notices: Vec<Notification> = store.notifications_of(user_id).cloned().collect();
-    notices.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    notices.sort_by_key(|notice| std::cmp::Reverse(notice.created_at));
     Ok(notices)
 }
 

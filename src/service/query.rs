@@ -238,7 +238,7 @@ pub fn reservations_of(store: &Store, user_id: &str, as_seller: bool) -> Vec<Res
         })
         .cloned()
         .collect();
-    list.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    list.sort_by_key(|entry| std::cmp::Reverse(entry.created_at));
     list
 }
 
@@ -256,7 +256,7 @@ pub fn trades_of(store: &Store, user_id: &str, as_seller: bool) -> Vec<Trade> {
         })
         .cloned()
         .collect();
-    list.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    list.sort_by_key(|entry| std::cmp::Reverse(entry.created_at));
     list
 }
 
@@ -334,6 +334,7 @@ mod tests {
         };
         let _draft_item = crate::service::item::save_draft(&mut store, &seller_id, &draft).unwrap();
 
+        // 演示数据里有 3 件已发布商品，草稿不应出现在买家列表中。
         let buyer_session = Session::new(&buyer_id, Role::Buyer);
         let page = search_items(
             &store,
@@ -344,7 +345,11 @@ mod tests {
             1,
         )
         .unwrap();
-        assert_eq!(page.total, 0);
+        assert_eq!(page.total, 3);
+        assert!(page
+            .items
+            .iter()
+            .all(|item| item.status.visible_to_buyer()));
 
         let seller_session = Session::new(&seller_id, Role::Seller);
         let page = search_items(
@@ -356,7 +361,8 @@ mod tests {
             1,
         )
         .unwrap();
-        assert_eq!(page.total, 1);
+        // 卖家可见自己名下全部状态：4 件演示商品 + 1 件新建草稿。
+        assert_eq!(page.total, 5);
     }
 
     #[test]
@@ -379,9 +385,9 @@ mod tests {
         let store = seed::demo_store();
         let seller_id = store.find_user_by_username("seller").unwrap().user_id.clone();
         let stats = seller_stats(&store, &seller_id).unwrap();
-        assert_eq!(stats.published, 0);
+        assert_eq!(stats.published, 3);
         assert_eq!(stats.sold, 0);
         assert_eq!(stats.reservations, 0);
-        assert_eq!(admin_stats(&store).unwrap().pending_items, 0);
+        assert_eq!(admin_stats(&store).unwrap().pending_items, 1);
     }
 }

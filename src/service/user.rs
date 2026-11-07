@@ -43,7 +43,7 @@ struct LoginSnapshot {
     lock_until: Option<chrono::DateTime<chrono::Utc>>,
     password_ok: bool,
     is_admin: bool,
-    is_seller: bool,
+    is_buyer: bool,
 }
 
 /// 注册新账号：校验唯一性、密码规则、验证码，写入用户并对密码加盐散列。
@@ -131,7 +131,7 @@ pub fn login(store: &mut Store, account: &str, password: &str) -> Result<Session
             lock_until: user.lock_until.filter(|until| *until > now),
             password_ok: security::verify_password(password, &user.password_hash),
             is_admin: user.admin_role,
-            is_seller: user.seller_role,
+            is_buyer: user.buyer_role,
         }
     };
 
@@ -167,12 +167,13 @@ pub fn login(store: &mut Store, account: &str, password: &str) -> Result<Session
     }
     store.sessions.retain(|session| session.user_id != snapshot.user_id);
 
+    // 管理员进后台；普通账号默认以买家视角进入，可在工作台切换角色。
     let role = if snapshot.is_admin {
         Role::Admin
-    } else if snapshot.is_seller {
-        Role::Seller
-    } else {
+    } else if snapshot.is_buyer {
         Role::Buyer
+    } else {
+        Role::Seller
     };
     let session = Session::new(snapshot.user_id.clone(), role);
     store.sessions.push(session.clone());
@@ -511,7 +512,7 @@ mod tests {
 
         let session = login(&mut store, "buyer01", "abcd1234").expect("用户名登录失败");
         assert_eq!(session.user_id, user_id);
-        assert_eq!(session.role, Role::Seller);
+        assert_eq!(session.role, Role::Buyer);
 
         let session = login(&mut store, PHONE, "abcd1234").expect("手机号登录失败");
         assert_eq!(session.user_id, user_id);

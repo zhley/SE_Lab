@@ -1,9 +1,11 @@
 //! 首次运行时的演示数据。
 //!
-//! 没有任何数据文件时初始化三个账号与常用分类，便于直接登录体验。
+//! 没有任何数据文件时初始化三个账号、常用分类与几件商品，便于直接体验。
 //! 密码同样经过加盐散列存储，与注册流程一致。
 
-use crate::domain::item::Category;
+use rust_decimal::Decimal;
+
+use crate::domain::item::{Category, Item, ItemStatus};
 use crate::domain::user::User;
 use crate::repo::Store;
 use crate::security;
@@ -14,6 +16,8 @@ pub const DEMO_ACCOUNTS: [(&str, &str); 3] = [
     ("seller", "seller123"),
     ("buyer", "buyer123"),
 ];
+
+const CATEGORIES: [&str; 5] = ["教材书籍", "数码电子", "生活用品", "运动器材", "其他"];
 
 /// 初始化演示数据。
 pub fn demo_store() -> Store {
@@ -44,13 +48,39 @@ pub fn demo_store() -> Store {
         security::hash_password("buyer123"),
     );
 
+    let seller_id = seller.user_id.clone();
     store.users.extend([admin, seller, buyer]);
 
-    for name in ["教材书籍", "数码电子", "生活用品", "运动器材", "其他"] {
+    for name in CATEGORIES {
         store.categories.push(Category::new(name));
     }
 
+    // 已发布商品：买家登录后可直接浏览、预约（REQ-015）。
+    demo_item(&mut store, &seller_id, 0, "高等数学教材（第七版）", "笔记完整，无破损", 25, ItemStatus::Published);
+    demo_item(&mut store, &seller_id, 1, "罗技无线鼠标 M330", "用了一学期，功能正常", 45, ItemStatus::Published);
+    demo_item(&mut store, &seller_id, 2, "宿舍护眼台灯", "亮度三档，附原装电源", 15, ItemStatus::Published);
+    // 待审核商品：管理员登录后可直接体验审核流程（REQ-006）。
+    demo_item(&mut store, &seller_id, 3, "二手篮球（7 号）", "气足，适合练习", 20, ItemStatus::Pending);
+
     store
+}
+
+fn demo_item(
+    store: &mut Store,
+    seller_id: &str,
+    category_index: usize,
+    title: &str,
+    description: &str,
+    price: i64,
+    status: ItemStatus,
+) {
+    let category_id = store.categories[category_index].category_id.clone();
+    let mut item = Item::new(seller_id, category_id);
+    item.title = title.to_string();
+    item.description = description.to_string();
+    item.price = Decimal::new(price, 0);
+    item.status = status;
+    store.items.push(item);
 }
 
 #[cfg(test)]
@@ -71,5 +101,14 @@ mod tests {
         }
         assert_eq!(store.users.len(), DEMO_ACCOUNTS.len());
         assert!(!store.categories.is_empty());
+        assert_eq!(store.items.len(), 4);
+        assert_eq!(
+            store
+                .items
+                .iter()
+                .filter(|item| item.status == ItemStatus::Published)
+                .count(),
+            3
+        );
     }
 }

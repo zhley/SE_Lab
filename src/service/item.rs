@@ -629,7 +629,8 @@ mod tests {
         let seller = seller_id(&store);
         let admin = admin_id(&store);
 
-        let item = save_draft(&mut store, &seller, &draft(&store, "二手教材", 25)).unwrap();
+        let item_draft = draft(&store, "二手教材", 25);
+        let item = save_draft(&mut store, &seller, &item_draft).unwrap();
         submit_audit(&mut store, &seller, &item.item_id).unwrap();
         approve(&mut store, &admin, &item.item_id).unwrap();
 
@@ -645,7 +646,8 @@ mod tests {
         let seller = seller_id(&store);
         let admin = admin_id(&store);
 
-        let item = save_draft(&mut store, &seller, &draft(&store, "违规物品", 5)).unwrap();
+        let item_draft = draft(&store, "违规物品", 5);
+        let item = save_draft(&mut store, &seller, &item_draft).unwrap();
         submit_audit(&mut store, &seller, &item.item_id).unwrap();
         assert!(reject(&mut store, &admin, &item.item_id, "  ").is_err());
 
@@ -663,7 +665,8 @@ mod tests {
     fn sold_item_cannot_change_status_again() {
         let mut store = seed::demo_store();
         let seller = seller_id(&store);
-        let item = save_draft(&mut store, &seller, &draft(&store, "旧书", 8)).unwrap();
+        let item_draft = draft(&store, "旧书", 8);
+        let item = save_draft(&mut store, &seller, &item_draft).unwrap();
         force_status(&mut store, &item.item_id, ItemStatus::Pending).unwrap();
         force_status(&mut store, &item.item_id, ItemStatus::Published).unwrap();
         force_status(&mut store, &item.item_id, ItemStatus::InTrade).unwrap();
