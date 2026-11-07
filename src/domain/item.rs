@@ -75,6 +75,8 @@ pub const ALLOWED_TRANSITIONS: &[(ItemStatus, ItemStatus)] = &[
     (ItemStatus::Pending, ItemStatus::Published),
     (ItemStatus::Pending, ItemStatus::Rejected),
     (ItemStatus::Rejected, ItemStatus::Pending),
+    // REQ-009：已发布商品修改后必须重新进入待审核。
+    (ItemStatus::Published, ItemStatus::Pending),
     (ItemStatus::Published, ItemStatus::InTrade),
     (ItemStatus::Published, ItemStatus::Offline),
     (ItemStatus::Published, ItemStatus::Violation),
