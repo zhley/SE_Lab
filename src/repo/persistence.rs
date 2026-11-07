@@ -89,7 +89,12 @@ mod tests {
 
         let persistence = JsonFilePersistence::new(&path);
         let mut store = Store::new();
-        store.users.push(User::new("tester", None, Some("t@example.com".into()), "hash"));
+        store.users.push(User::new(
+            "tester",
+            None,
+            Some("t@example.com".into()),
+            "hash",
+        ));
 
         persistence.save(&store).expect("保存失败");
         let loaded = persistence.load().expect("加载失败");

@@ -120,8 +120,16 @@ mod tests {
     #[test]
     fn only_admin_can_query() {
         let mut store = seed::demo_store();
-        let admin_id = store.find_user_by_username("admin").unwrap().user_id.clone();
-        let buyer_id = store.find_user_by_username("buyer").unwrap().user_id.clone();
+        let admin_id = store
+            .find_user_by_username("admin")
+            .unwrap()
+            .user_id
+            .clone();
+        let buyer_id = store
+            .find_user_by_username("buyer")
+            .unwrap()
+            .user_id
+            .clone();
 
         record(
             &mut store,

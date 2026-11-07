@@ -42,9 +42,7 @@ pub fn create_reservation(
         )));
     }
     if seller_id == buyer_id {
-        return Err(AppError::PermissionDenied(
-            "不能预约自己发布的商品".into(),
-        ));
+        return Err(AppError::PermissionDenied("不能预约自己发布的商品".into()));
     }
     if version != item_version {
         return Err(AppError::StateConflict(
@@ -207,9 +205,7 @@ pub fn cancel_reservation(
     };
 
     if operator_id != buyer_id && operator_id != seller_id {
-        return Err(AppError::PermissionDenied(
-            "只能取消自己的预约".into(),
-        ));
+        return Err(AppError::PermissionDenied("只能取消自己的预约".into()));
     }
     if !status.is_active() {
         return Err(AppError::StateConflict(format!(
@@ -361,9 +357,7 @@ pub fn confirm_trade_by_buyer(store: &mut Store, buyer_id: &str, trade_id: &str)
         .ok_or_else(|| AppError::NotFound("交易记录不存在".into()))?;
 
     if trade.buyer_id != buyer_id {
-        return Err(AppError::PermissionDenied(
-            "只有买家可以确认交易".into(),
-        ));
+        return Err(AppError::PermissionDenied("只有买家可以确认交易".into()));
     }
     // 重复点击只记录一次。
     if trade.buyer_confirmed {
@@ -392,7 +386,11 @@ pub fn auto_confirm_overdue(store: &mut Store) -> Result<usize> {
     let now = util::now();
     let mut count = 0;
     for trade in store.trades.iter_mut() {
-        if !trade.buyer_confirmed && trade.confirm_deadline.is_some_and(|deadline| deadline <= now) {
+        if !trade.buyer_confirmed
+            && trade
+                .confirm_deadline
+                .is_some_and(|deadline| deadline <= now)
+        {
             trade.buyer_confirmed = true;
             count += 1;
         }
@@ -410,17 +408,16 @@ pub fn invalidate_pending_reservations(
     let now = util::now();
     let mut affected: Vec<(String, String)> = Vec::new();
 
-    for reservation in store
-        .reservations
-        .iter_mut()
-        .filter(|reservation| {
-            reservation.item_id == item_id && reservation.status == ReservationStatus::Pending
-        })
-    {
+    for reservation in store.reservations.iter_mut().filter(|reservation| {
+        reservation.item_id == item_id && reservation.status == ReservationStatus::Pending
+    }) {
         reservation.status = ReservationStatus::Invalid;
         reservation.invalid_reason = Some(reason.to_string());
         reservation.updated_at = now;
-        affected.push((reservation.reservation_id.clone(), reservation.buyer_id.clone()));
+        affected.push((
+            reservation.reservation_id.clone(),
+            reservation.buyer_id.clone(),
+        ));
     }
 
     let count = affected.len();
@@ -445,9 +442,21 @@ mod tests {
 
     fn ids(store: &Store) -> (String, String, String) {
         (
-            store.find_user_by_username("seller").unwrap().user_id.clone(),
-            store.find_user_by_username("buyer").unwrap().user_id.clone(),
-            store.find_user_by_username("admin").unwrap().user_id.clone(),
+            store
+                .find_user_by_username("seller")
+                .unwrap()
+                .user_id
+                .clone(),
+            store
+                .find_user_by_username("buyer")
+                .unwrap()
+                .user_id
+                .clone(),
+            store
+                .find_user_by_username("admin")
+                .unwrap()
+                .user_id
+                .clone(),
         )
     }
 

@@ -86,7 +86,11 @@ pub struct Appeal {
 }
 
 impl Appeal {
-    pub fn new(violation_id: impl Into<String>, seller_id: impl Into<String>, reason: impl Into<String>) -> Self {
+    pub fn new(
+        violation_id: impl Into<String>,
+        seller_id: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
         Self {
             appeal_id: util::new_id("P"),
             violation_id: violation_id.into(),

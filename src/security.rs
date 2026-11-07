@@ -224,9 +224,7 @@ pub fn validate_password(password: &str) -> Result<()> {
     let has_letter = password.chars().any(|ch| ch.is_ascii_alphabetic());
     let has_digit = password.chars().any(|ch| ch.is_ascii_digit());
     if !has_letter || !has_digit {
-        return Err(AppError::InvalidInput(
-            "密码需同时包含字母和数字".into(),
-        ));
+        return Err(AppError::InvalidInput("密码需同时包含字母和数字".into()));
     }
     Ok(())
 }
@@ -234,7 +232,9 @@ pub fn validate_password(password: &str) -> Result<()> {
 /// 手机号：11 位数字且以 1 开头。
 pub fn validate_phone(phone: &str) -> Result<()> {
     let digits = phone.trim();
-    if digits.len() != 11 || !digits.chars().all(|ch| ch.is_ascii_digit()) || !digits.starts_with('1')
+    if digits.len() != 11
+        || !digits.chars().all(|ch| ch.is_ascii_digit())
+        || !digits.starts_with('1')
     {
         return Err(AppError::InvalidInput("手机号格式不正确".into()));
     }
@@ -278,7 +278,9 @@ mod tests {
         );
         // 长度跨过 56 字节补位边界。
         assert_eq!(
-            to_hex(&sha256(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")),
+            to_hex(&sha256(
+                b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+            )),
             "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
         );
     }

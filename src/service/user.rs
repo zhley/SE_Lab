@@ -55,9 +55,7 @@ pub fn register(store: &mut Store, req: &RegisterRequest) -> Result<User> {
     let phone = non_empty(req.phone.as_deref());
     let email = non_empty(req.email.as_deref());
     if phone.is_none() && email.is_none() {
-        return Err(AppError::InvalidInput(
-            "手机号与邮箱至少填写一项".into(),
-        ));
+        return Err(AppError::InvalidInput("手机号与邮箱至少填写一项".into()));
     }
     if let Some(phone) = &phone {
         security::validate_phone(phone)?;
@@ -137,9 +135,7 @@ pub fn login(store: &mut Store, account: &str, password: &str) -> Result<Session
 
     if snapshot.banned {
         record_login_failure(store, &snapshot.user_id, "账号已被封禁")?;
-        return Err(AppError::PermissionDenied(
-            "账号已被封禁，无法登录".into(),
-        ));
+        return Err(AppError::PermissionDenied("账号已被封禁，无法登录".into()));
     }
 
     if let Some(until) = snapshot.lock_until {
@@ -165,7 +161,9 @@ pub fn login(store: &mut Store, account: &str, password: &str) -> Result<Session
         user.fail_count = 0;
         user.lock_until = None;
     }
-    store.sessions.retain(|session| session.user_id != snapshot.user_id);
+    store
+        .sessions
+        .retain(|session| session.user_id != snapshot.user_id);
 
     // 管理员进后台；普通账号默认以买家视角进入，可在工作台切换角色。
     let role = if snapshot.is_admin {
@@ -210,9 +208,7 @@ pub fn logout(store: &mut Store, token: &str) -> Result<()> {
 pub fn issue_captcha(store: &mut Store, target: &str) -> Result<String> {
     let target = target.trim();
     if target.is_empty() {
-        return Err(AppError::InvalidInput(
-            "请先填写手机号或邮箱".into(),
-        ));
+        return Err(AppError::InvalidInput("请先填写手机号或邮箱".into()));
     }
     if target.contains('@') {
         security::validate_email(target)?;
@@ -430,9 +426,7 @@ fn consume_captcha(store: &mut Store, target: &str, code: &str) -> Result<()> {
         .ok_or_else(|| AppError::InvalidInput("验证码不存在，请先获取验证码".into()))?;
 
     if !captcha.is_valid(now) {
-        return Err(AppError::InvalidInput(
-            "验证码已过期，请重新获取".into(),
-        ));
+        return Err(AppError::InvalidInput("验证码已过期，请重新获取".into()));
     }
     if captcha.code != code {
         return Err(AppError::InvalidInput("验证码错误".into()));
@@ -614,7 +608,9 @@ mod tests {
         }
         assert!(login(&mut store, "buyer01", "abcd1234").is_err());
 
-        let admin_id = store.find_user_by_username("admin").map(|u| u.user_id.clone());
+        let admin_id = store
+            .find_user_by_username("admin")
+            .map(|u| u.user_id.clone());
         let admin_id = match admin_id {
             Some(id) => id,
             None => {
@@ -636,8 +632,16 @@ mod tests {
     #[test]
     fn banned_user_cannot_login_and_sessions_are_dropped() {
         let mut store = seed::demo_store();
-        let admin_id = store.find_user_by_username("admin").unwrap().user_id.clone();
-        let buyer_id = store.find_user_by_username("buyer").unwrap().user_id.clone();
+        let admin_id = store
+            .find_user_by_username("admin")
+            .unwrap()
+            .user_id
+            .clone();
+        let buyer_id = store
+            .find_user_by_username("buyer")
+            .unwrap()
+            .user_id
+            .clone();
         let session = login(&mut store, "buyer", "buyer123").unwrap();
         assert!(authenticate(&store, &session, None).is_ok());
 
@@ -651,8 +655,16 @@ mod tests {
     #[test]
     fn non_admin_cannot_ban() {
         let mut store = seed::demo_store();
-        let seller_id = store.find_user_by_username("seller").unwrap().user_id.clone();
-        let buyer_id = store.find_user_by_username("buyer").unwrap().user_id.clone();
+        let seller_id = store
+            .find_user_by_username("seller")
+            .unwrap()
+            .user_id
+            .clone();
+        let buyer_id = store
+            .find_user_by_username("buyer")
+            .unwrap()
+            .user_id
+            .clone();
         assert!(matches!(
             ban_user(&mut store, &seller_id, &buyer_id, "看你不顺眼"),
             Err(AppError::PermissionDenied(_))

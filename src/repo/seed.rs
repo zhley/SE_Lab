@@ -56,11 +56,43 @@ pub fn demo_store() -> Store {
     }
 
     // 已发布商品：买家登录后可直接浏览、预约（REQ-015）。
-    demo_item(&mut store, &seller_id, 0, "高等数学教材（第七版）", "笔记完整，无破损", 25, ItemStatus::Published);
-    demo_item(&mut store, &seller_id, 1, "罗技无线鼠标 M330", "用了一学期，功能正常", 45, ItemStatus::Published);
-    demo_item(&mut store, &seller_id, 2, "宿舍护眼台灯", "亮度三档，附原装电源", 15, ItemStatus::Published);
+    demo_item(
+        &mut store,
+        &seller_id,
+        0,
+        "高等数学教材（第七版）",
+        "笔记完整，无破损",
+        25,
+        ItemStatus::Published,
+    );
+    demo_item(
+        &mut store,
+        &seller_id,
+        1,
+        "罗技无线鼠标 M330",
+        "用了一学期，功能正常",
+        45,
+        ItemStatus::Published,
+    );
+    demo_item(
+        &mut store,
+        &seller_id,
+        2,
+        "宿舍护眼台灯",
+        "亮度三档，附原装电源",
+        15,
+        ItemStatus::Published,
+    );
     // 待审核商品：管理员登录后可直接体验审核流程（REQ-006）。
-    demo_item(&mut store, &seller_id, 3, "二手篮球（7 号）", "气足，适合练习", 20, ItemStatus::Pending);
+    demo_item(
+        &mut store,
+        &seller_id,
+        3,
+        "二手篮球（7 号）",
+        "气足，适合练习",
+        20,
+        ItemStatus::Pending,
+    );
 
     store
 }

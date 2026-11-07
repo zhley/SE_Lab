@@ -54,7 +54,12 @@ pub struct Reservation {
 }
 
 impl Reservation {
-    pub fn new(item_id: impl Into<String>, buyer_id: impl Into<String>, seller_id: impl Into<String>, item_version: u64) -> Self {
+    pub fn new(
+        item_id: impl Into<String>,
+        buyer_id: impl Into<String>,
+        seller_id: impl Into<String>,
+        item_version: u64,
+    ) -> Self {
         let now = util::now();
         Self {
             reservation_id: util::new_id("R"),

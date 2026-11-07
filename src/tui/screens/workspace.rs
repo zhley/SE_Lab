@@ -244,10 +244,7 @@ fn render_content(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    frame.render_widget(
-        Paragraph::new(lines).wrap(Wrap { trim: true }),
-        inner,
-    );
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), inner);
 }
 
 fn build_lines(app: &App) -> Vec<Line<'static>> {
@@ -427,10 +424,7 @@ fn render_item_form(frame: &mut Frame, area: Rect, app: &App, form: &ItemForm) {
             Style::new().fg(Color::DarkGray),
         )));
         let cursor = if focused { "▏" } else { "" };
-        lines.push(Line::from(Span::styled(
-            format!(" {value}{cursor}"),
-            style,
-        )));
+        lines.push(Line::from(Span::styled(format!(" {value}{cursor}"), style)));
         lines.push(Line::from(""));
     }
     lines.push(Line::from(Span::styled(
@@ -438,10 +432,7 @@ fn render_item_form(frame: &mut Frame, area: Rect, app: &App, form: &ItemForm) {
         Style::new().fg(Color::DarkGray),
     )));
 
-    frame.render_widget(
-        Paragraph::new(lines).wrap(Wrap { trim: false }),
-        area,
-    );
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
 }
 
 fn render_dialog(frame: &mut Frame, dialog: &Dialog) {
@@ -487,7 +478,8 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
         .filter(|hint| !hint.is_empty())
         .unwrap_or("");
 
-    let mut keys = String::from(" Tab 切页   ↑↓ 选择   Enter 操作   Esc 退出登录   F4 切角色   Q 退出 ");
+    let mut keys =
+        String::from(" Tab 切页   ↑↓ 选择   Enter 操作   Esc 退出登录   F4 切角色   Q 退出 ");
     if !page_hint.is_empty() {
         keys.push_str(" | ");
         keys.push_str(page_hint);

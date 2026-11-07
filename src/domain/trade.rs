@@ -41,7 +41,12 @@ pub struct Trade {
 }
 
 impl Trade {
-    pub fn new(reservation_id: impl Into<String>, item_id: impl Into<String>, buyer_id: impl Into<String>, seller_id: impl Into<String>) -> Self {
+    pub fn new(
+        reservation_id: impl Into<String>,
+        item_id: impl Into<String>,
+        buyer_id: impl Into<String>,
+        seller_id: impl Into<String>,
+    ) -> Self {
         Self {
             trade_id: util::new_id("D"),
             item_id: item_id.into(),

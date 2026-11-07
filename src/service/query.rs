@@ -323,8 +323,16 @@ mod tests {
     #[test]
     fn buyer_only_sees_published_items() {
         let mut store = seed::demo_store();
-        let seller_id = store.find_user_by_username("seller").unwrap().user_id.clone();
-        let buyer_id = store.find_user_by_username("buyer").unwrap().user_id.clone();
+        let seller_id = store
+            .find_user_by_username("seller")
+            .unwrap()
+            .user_id
+            .clone();
+        let buyer_id = store
+            .find_user_by_username("buyer")
+            .unwrap()
+            .user_id
+            .clone();
 
         let draft = crate::service::item::ItemDraft {
             title: "教材".into(),
@@ -346,10 +354,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(page.total, 3);
-        assert!(page
-            .items
-            .iter()
-            .all(|item| item.status.visible_to_buyer()));
+        assert!(page.items.iter().all(|item| item.status.visible_to_buyer()));
 
         let seller_session = Session::new(&seller_id, Role::Seller);
         let page = search_items(
@@ -368,14 +373,19 @@ mod tests {
     #[test]
     fn invalid_price_range_returns_empty_page() {
         let store = seed::demo_store();
-        let buyer_id = store.find_user_by_username("buyer").unwrap().user_id.clone();
+        let buyer_id = store
+            .find_user_by_username("buyer")
+            .unwrap()
+            .user_id
+            .clone();
         let session = Session::new(&buyer_id, Role::Buyer);
         let filter = ItemFilter {
             price_min: Some(Decimal::new(100, 0)),
             price_max: Some(Decimal::new(10, 0)),
             ..Default::default()
         };
-        let page = search_items(&store, &session, &filter, SortBy::Price, SortOrder::Asc, 1).unwrap();
+        let page =
+            search_items(&store, &session, &filter, SortBy::Price, SortOrder::Asc, 1).unwrap();
         assert!(page.items.is_empty());
         assert_eq!(page.total, 0);
     }
@@ -383,7 +393,11 @@ mod tests {
     #[test]
     fn seller_stats_counts_by_status() {
         let store = seed::demo_store();
-        let seller_id = store.find_user_by_username("seller").unwrap().user_id.clone();
+        let seller_id = store
+            .find_user_by_username("seller")
+            .unwrap()
+            .user_id
+            .clone();
         let stats = seller_stats(&store, &seller_id).unwrap();
         assert_eq!(stats.published, 3);
         assert_eq!(stats.sold, 0);

@@ -128,9 +128,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(mark_all_read(&mut store, "U1").unwrap(), 1);
-        assert!(store
-            .notifications
-            .iter()
-            .any(|notice| notice.notice_id == other.notice_id && notice.read));
+        assert!(
+            store
+                .notifications
+                .iter()
+                .any(|notice| notice.notice_id == other.notice_id && notice.read)
+        );
     }
 }

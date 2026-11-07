@@ -58,9 +58,7 @@ pub fn update_item(
             .item(item_id)
             .ok_or_else(|| AppError::NotFound("商品不存在".into()))?;
         if item.seller_id != seller_id {
-            return Err(AppError::PermissionDenied(
-                "只能修改自己发布的商品".into(),
-            ));
+            return Err(AppError::PermissionDenied("只能修改自己发布的商品".into()));
         }
         if !item.status.editable() {
             return Err(AppError::StateConflict(format!(
@@ -91,7 +89,12 @@ pub fn update_item(
 
     if back_to_audit {
         force_status(store, item_id, ItemStatus::Pending)?;
-        remember_submit(store, seller_id, item_id, &format!("商品「{title}」修改后重新提交审核"))?;
+        remember_submit(
+            store,
+            seller_id,
+            item_id,
+            &format!("商品「{title}」修改后重新提交审核"),
+        )?;
     }
 
     Ok(())
@@ -104,9 +107,7 @@ pub fn submit_audit(store: &mut Store, seller_id: &str, item_id: &str) -> Result
             .item(item_id)
             .ok_or_else(|| AppError::NotFound("商品不存在".into()))?;
         if item.seller_id != seller_id {
-            return Err(AppError::PermissionDenied(
-                "只能提交自己发布的商品".into(),
-            ));
+            return Err(AppError::PermissionDenied("只能提交自己发布的商品".into()));
         }
         validate_draft(
             store,
@@ -250,9 +251,7 @@ pub fn reject(store: &mut Store, admin_id: &str, item_id: &str, reason: &str) ->
 pub fn take_offline(store: &mut Store, seller_id: &str, item_id: &str) -> Result<()> {
     let (owner, _, status) = item_brief(store, item_id)?;
     if owner != seller_id {
-        return Err(AppError::PermissionDenied(
-            "只能下架自己发布的商品".into(),
-        ));
+        return Err(AppError::PermissionDenied("只能下架自己发布的商品".into()));
     }
     if status != ItemStatus::Published {
         return Err(AppError::StateConflict(format!(
@@ -378,9 +377,7 @@ pub fn submit_appeal(
         ));
     }
     if !violation.can_appeal(util::now()) {
-        return Err(AppError::StateConflict(
-            "已超过 7 天申诉期限".into(),
-        ));
+        return Err(AppError::StateConflict("已超过 7 天申诉期限".into()));
     }
 
     let appeal = Appeal::new(violation_id, seller_id, reason);
@@ -469,7 +466,11 @@ pub fn handle_appeal(
             target_type: EntityKind::Appeal,
             target_id: appeal_id,
             result: LogResult::Success,
-            detail: if accept { "受理申诉" } else { "驳回申诉" },
+            detail: if accept {
+                "受理申诉"
+            } else {
+                "驳回申诉"
+            },
         },
     )?;
 
@@ -598,11 +599,19 @@ mod tests {
     }
 
     fn seller_id(store: &Store) -> String {
-        store.find_user_by_username("seller").unwrap().user_id.clone()
+        store
+            .find_user_by_username("seller")
+            .unwrap()
+            .user_id
+            .clone()
     }
 
     fn admin_id(store: &Store) -> String {
-        store.find_user_by_username("admin").unwrap().user_id.clone()
+        store
+            .find_user_by_username("admin")
+            .unwrap()
+            .user_id
+            .clone()
     }
 
     #[test]
@@ -655,10 +664,12 @@ mod tests {
         let stored = store.item(&item.item_id).unwrap();
         assert_eq!(stored.status, ItemStatus::Rejected);
         assert_eq!(stored.reject_reason.as_deref(), Some("描述含违规内容"));
-        assert!(store
-            .audits
-            .iter()
-            .any(|record| record.result == AuditResult::Rejected));
+        assert!(
+            store
+                .audits
+                .iter()
+                .any(|record| record.result == AuditResult::Rejected)
+        );
     }
 
     #[test]

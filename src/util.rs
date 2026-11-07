@@ -23,7 +23,9 @@ pub fn new_id(prefix: &str) -> String {
 
 /// 格式化为本地时间字符串 `2026-11-07 12:30`，用于 TUI 展示。
 pub fn format_time(time: DateTime<Utc>) -> String {
-    time.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string()
+    time.with_timezone(&Local)
+        .format("%Y-%m-%d %H:%M")
+        .to_string()
 }
 
 /// 可选时间格式化：`None` 显示为 `-`。

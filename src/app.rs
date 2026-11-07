@@ -597,8 +597,12 @@ impl App {
             return;
         };
         let user_id = self.user_id();
-        let result =
-            service::trade::create_reservation(&mut self.store, &user_id, &item.item_id, item.version);
+        let result = service::trade::create_reservation(
+            &mut self.store,
+            &user_id,
+            &item.item_id,
+            item.version,
+        );
         self.report(result.map(|_| "预约成功，等待卖家确认".to_string()));
     }
 
@@ -651,7 +655,8 @@ impl App {
             return;
         };
         let user_id = self.user_id();
-        let result = service::trade::confirm_trade_by_buyer(&mut self.store, &user_id, &trade.trade_id);
+        let result =
+            service::trade::confirm_trade_by_buyer(&mut self.store, &user_id, &trade.trade_id);
         self.report(result.map(|_| "已确认交易".to_string()));
     }
 
@@ -859,9 +864,13 @@ impl App {
             return;
         };
         match dialog {
-            Dialog::Input { action, buffer, .. } => self.run_input(action, buffer.trim().to_string()),
+            Dialog::Input { action, buffer, .. } => {
+                self.run_input(action, buffer.trim().to_string())
+            }
             Dialog::Confirm { action, .. } => match key.code {
-                KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => self.run_confirm(action),
+                KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                    self.run_confirm(action)
+                }
                 _ => self.set_status(StatusMessage::info("已取消操作")),
             },
         }
@@ -870,20 +879,14 @@ impl App {
     fn run_input(&mut self, action: InputAction, text: String) {
         let user_id = self.user_id();
         let result = match action {
-            InputAction::RejectItem(item_id) => service::item::reject(
-                &mut self.store,
-                &user_id,
-                &item_id,
-                &text,
-            )
-            .map(|_| "已驳回该商品".to_string()),
-            InputAction::MarkViolation(item_id) => service::item::mark_violation(
-                &mut self.store,
-                &user_id,
-                &item_id,
-                &text,
-            )
-            .map(|_| "已违规下架，卖家可在 7 天内申诉".to_string()),
+            InputAction::RejectItem(item_id) => {
+                service::item::reject(&mut self.store, &user_id, &item_id, &text)
+                    .map(|_| "已驳回该商品".to_string())
+            }
+            InputAction::MarkViolation(item_id) => {
+                service::item::mark_violation(&mut self.store, &user_id, &item_id, &text)
+                    .map(|_| "已违规下架，卖家可在 7 天内申诉".to_string())
+            }
             InputAction::BanUser(target_id) => {
                 service::user::ban_user(&mut self.store, &user_id, &target_id, &text)
                     .map(|_| "已封禁该用户".to_string())
@@ -1052,14 +1055,10 @@ impl App {
         let user_id = self.user_id();
 
         let saved = match &form.item_id {
-            Some(item_id) => service::item::update_item(
-                &mut self.store,
-                &user_id,
-                item_id,
-                &draft,
-                form.version,
-            )
-            .map(|_| item_id.clone()),
+            Some(item_id) => {
+                service::item::update_item(&mut self.store, &user_id, item_id, &draft, form.version)
+                    .map(|_| item_id.clone())
+            }
             None => service::item::save_draft(&mut self.store, &user_id, &draft)
                 .map(|item| item.item_id),
         };
@@ -1112,10 +1111,11 @@ impl App {
             Some(Page::MyReservations) => {
                 PageData::Reservations(query::reservations_of(&self.store, &user_id, false))
             }
-            Some(Page::MyTrades) => PageData::Trades(query::trades_of(&self.store, &user_id, false)),
+            Some(Page::MyTrades) => {
+                PageData::Trades(query::trades_of(&self.store, &user_id, false))
+            }
             Some(Page::MyItems) => {
-                let mut items: Vec<Item> =
-                    self.store.items_of_seller(&user_id).cloned().collect();
+                let mut items: Vec<Item> = self.store.items_of_seller(&user_id).cloned().collect();
                 items.sort_by_key(|item| std::cmp::Reverse(item.created_at));
                 PageData::Items(items)
             }
@@ -1135,15 +1135,13 @@ impl App {
                 ]),
                 Err(err) => PageData::Lines(vec![format!("统计失败：{err}")]),
             },
-            Some(Page::Notifications) => {
-                match service::notice::list(&self.store, &user_id) {
-                    Ok(list) => PageData::Notices(list),
-                    Err(err) => {
-                        self.status = StatusMessage::error(format!("读取通知失败：{err}"));
-                        PageData::Empty
-                    }
+            Some(Page::Notifications) => match service::notice::list(&self.store, &user_id) {
+                Ok(list) => PageData::Notices(list),
+                Err(err) => {
+                    self.status = StatusMessage::error(format!("读取通知失败：{err}"));
+                    PageData::Empty
                 }
-            }
+            },
             Some(Page::AdminAudit) => PageData::Items(query::pending_items(&self.store)),
             Some(Page::AdminViolations) => PageData::Items(query::published_items(&self.store)),
             Some(Page::AdminAppeals) => PageData::Appeals(query::pending_appeals(&self.store)),
@@ -1362,7 +1360,9 @@ impl App {
         self.view = View::Workspace;
         self.menu_index = 0;
         self.cursor = 0;
-        self.set_status(StatusMessage::success(format!("登录成功，欢迎回来 {greeting}")));
+        self.set_status(StatusMessage::success(format!(
+            "登录成功，欢迎回来 {greeting}"
+        )));
         self.refresh();
     }
 

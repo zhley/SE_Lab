@@ -20,11 +20,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     let chunks = Layout::vertical([Constraint::Min(0), Constraint::Length(2)]).split(area);
 
     let (height, title, hint) = match app.auth.mode {
-        AuthMode::Login => (
-            10,
-            "登录",
-            format!("演示账号：{}", demo_account_hint()),
-        ),
+        AuthMode::Login => (10, "登录", format!("演示账号：{}", demo_account_hint())),
         AuthMode::Register => (
             19,
             "注册",
@@ -65,12 +61,16 @@ pub fn render(frame: &mut Frame, app: &App) {
         Style::new().fg(Color::DarkGray),
     )));
 
-    let form = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+    let form = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false });
     frame.render_widget(form, form_area);
 
     let key_hint = match app.auth.mode {
         AuthMode::Login => " Tab 切换输入框   Enter 登录   F2 去注册   Esc 退出 ",
-        AuthMode::Register => " Tab 切换输入框   F3 获取验证码   Enter 注册   F2 返回登录   Esc 返回 ",
+        AuthMode::Register => {
+            " Tab 切换输入框   F3 获取验证码   Enter 注册   F2 返回登录   Esc 返回 "
+        }
     };
     let footer = Paragraph::new(vec![
         Line::from(vec![
