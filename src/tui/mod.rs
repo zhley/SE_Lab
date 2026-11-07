@@ -16,7 +16,7 @@ use ratatui::{DefaultTerminal, Frame, Terminal, backend::CrosstermBackend};
 
 use crate::app::{App, View};
 
-pub const APP_TITLE: &str = "校园二手交易平台";
+pub const APP_TITLE: &str = "二手市集";
 
 /// 进入备用屏并开启 raw mode。
 pub fn init() -> io::Result<DefaultTerminal> {

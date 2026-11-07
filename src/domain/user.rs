@@ -176,3 +176,32 @@ impl Session {
         self.expire_at <= now
     }
 }
+
+/// 注册验证码（REQ-028）：5 分钟内有效，使用一次后失效。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Captcha {
+    /// 接收验证码的手机号或邮箱。
+    pub target: String,
+    pub code: String,
+    pub created_at: DateTime<Utc>,
+    pub expire_at: DateTime<Utc>,
+    pub used: bool,
+}
+
+impl Captcha {
+    /// 生成一张 5 分钟有效的验证码。
+    pub fn new(target: impl Into<String>, code: impl Into<String>, ttl_minutes: i64) -> Self {
+        let now = util::now();
+        Self {
+            target: target.into(),
+            code: code.into(),
+            created_at: now,
+            expire_at: now + Duration::minutes(ttl_minutes),
+            used: false,
+        }
+    }
+
+    pub fn is_valid(&self, now: DateTime<Utc>) -> bool {
+        !self.used && self.expire_at > now
+    }
+}

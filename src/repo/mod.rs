@@ -1,9 +1,12 @@
-//! 数据层：内存数据存储与查询辅助。
+//! 数据层：业务数据集合、查询辅助与持久化。
 //!
-//! 骨架阶段使用内存集合承载全部业务数据，后续通过
-//! [`persistence::Persistence`] 接入文件持久化，业务层接口不随之改变。
+//! 骨架阶段以内存集合承载全部业务数据，通过
+//! [`persistence::JsonFilePersistence`] 全量写入 JSON 文件。
 
 pub mod persistence;
+pub mod seed;
+
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,21 +16,43 @@ use crate::domain::log::OperationLog;
 use crate::domain::notice::Notification;
 use crate::domain::reservation::Reservation;
 use crate::domain::trade::Trade;
-use crate::domain::user::{Session, User};
+use crate::domain::user::{Captcha, Session, User};
+
+/// 默认数据文件位置（相对工作目录），可用环境变量 `SE_LAB_DATA` 覆盖。
+pub fn default_data_path() -> PathBuf {
+    std::env::var_os("SE_LAB_DATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("data").join("store.json"))
+}
 
 /// 全量业务数据。
+///
+/// 所有字段都带 `serde(default)`，便于旧数据文件在新增字段后仍能加载。
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Store {
+    #[serde(default)]
     pub users: Vec<User>,
+    #[serde(default)]
     pub sessions: Vec<Session>,
+    #[serde(default)]
+    pub captchas: Vec<Captcha>,
+    #[serde(default)]
     pub categories: Vec<Category>,
+    #[serde(default)]
     pub items: Vec<Item>,
+    #[serde(default)]
     pub reservations: Vec<Reservation>,
+    #[serde(default)]
     pub trades: Vec<Trade>,
+    #[serde(default)]
     pub audits: Vec<AuditRecord>,
+    #[serde(default)]
     pub violations: Vec<ViolationRecord>,
+    #[serde(default)]
     pub appeals: Vec<Appeal>,
+    #[serde(default)]
     pub notifications: Vec<Notification>,
+    #[serde(default)]
     pub logs: Vec<OperationLog>,
 }
 
@@ -48,11 +73,28 @@ impl Store {
 
     /// 按用户名 / 手机号 / 邮箱查找账号（REQ-002 三种登录方式）。
     pub fn find_user_by_account(&self, account: &str) -> Option<&User> {
+        let account = account.trim();
         self.users.iter().find(|u| {
-            u.username == account
+            u.username.eq_ignore_ascii_case(account)
                 || u.phone.as_deref() == Some(account)
                 || u.email.as_deref() == Some(account)
         })
+    }
+
+    pub fn find_user_by_username(&self, username: &str) -> Option<&User> {
+        self.users
+            .iter()
+            .find(|u| u.username.eq_ignore_ascii_case(username.trim()))
+    }
+
+    /// 该手机号是否已被绑定。
+    pub fn phone_taken(&self, phone: &str) -> bool {
+        self.users.iter().any(|u| u.phone.as_deref() == Some(phone))
+    }
+
+    /// 该邮箱是否已被绑定。
+    pub fn email_taken(&self, email: &str) -> bool {
+        self.users.iter().any(|u| u.email.as_deref() == Some(email))
     }
 
     // ---------- 商品 ----------

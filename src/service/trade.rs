@@ -1,10 +1,11 @@
 //! 预约与交易服务（REQ-015 ~ REQ-021）。
 
-use crate::domain::reservation::Reservation;
+use crate::domain::reservation::{Reservation, ReservationStatus};
 use crate::domain::trade::Trade;
 use crate::error::Result;
 use crate::repo::Store;
 use crate::service::not_implemented;
+use crate::util;
 
 /// 买家发起预约（REQ-004、REQ-015、REQ-016、REQ-021）。
 ///
@@ -54,6 +55,24 @@ pub fn auto_confirm_overdue(_store: &mut Store) -> Result<usize> {
 }
 
 /// 商品下架/违规时，把其下所有待确认预约置为失效（REQ-010、REQ-011）。
-pub fn invalidate_pending_reservations(_store: &mut Store, _item_id: &str, _reason: &str) -> Result<usize> {
-    not_implemented("service::trade::invalidate_pending_reservations")
+///
+/// 返回失效的预约条数。通知相关买家由 [`crate::service::notice`] 在后续步骤补上。
+pub fn invalidate_pending_reservations(
+    store: &mut Store,
+    item_id: &str,
+    reason: &str,
+) -> Result<usize> {
+    let now = util::now();
+    let mut count = 0;
+    for reservation in store
+        .reservations
+        .iter_mut()
+        .filter(|r| r.item_id == item_id && r.status == ReservationStatus::Pending)
+    {
+        reservation.status = ReservationStatus::Invalid;
+        reservation.invalid_reason = Some(reason.to_string());
+        reservation.updated_at = now;
+        count += 1;
+    }
+    Ok(count)
 }

@@ -1,7 +1,8 @@
 //! 应用状态与事件循环。
 //!
-//! 界面路由很简单：未登录进入登录页，登录后按会话角色进入工作台。
-//! 所有键盘输入在这里转成界面动作，业务调用统一走 [`crate::service`]。
+//! 界面路由很简单：未登录进入登录 / 注册页，登录后按会话角色进入工作台。
+//! 所有键盘输入在这里转成界面动作，业务调用统一走 [`crate::service`]，
+//! 数据变更后立即落盘（JSON 全量写入）。
 
 use std::time::Duration;
 
@@ -9,8 +10,9 @@ use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::domain::user::{Role, Session, User};
-use crate::error::Result;
-use crate::repo::Store;
+use crate::error::{AppError, Result};
+use crate::repo::persistence::{JsonFilePersistence, Persistence};
+use crate::repo::{self, Store, seed};
 use crate::service;
 use crate::tui;
 use crate::tui::screens::workspace::Page;
@@ -64,66 +66,128 @@ impl StatusMessage {
 
 impl Default for StatusMessage {
     fn default() -> Self {
-        Self::info("提示：Tab 切换输入框，Enter 登录，Esc 退出")
+        Self::info("提示：Tab 切换输入框，Enter 提交，F2 切换登录/注册")
     }
 }
 
-/// 登录表单的输入焦点。
+/// 认证页模式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LoginField {
-    Account,
-    Password,
+pub enum AuthMode {
+    Login,
+    Register,
 }
 
-/// 登录表单状态。
+const LOGIN_LABELS: [&str; 2] = ["账号（用户名 / 手机号 / 邮箱）", "密码"];
+const REGISTER_LABELS: [&str; 5] = [
+    "用户名",
+    "密码",
+    "手机号（与邮箱至少填一项）",
+    "邮箱",
+    "验证码",
+];
+
+/// 登录 / 注册表单状态。
 #[derive(Debug, Clone)]
-pub struct LoginForm {
+pub struct AuthForm {
+    pub mode: AuthMode,
     pub account: String,
     pub password: String,
-    pub field: LoginField,
+    pub username: String,
+    pub phone: String,
+    pub email: String,
+    pub captcha: String,
+    /// 当前焦点字段下标。
+    pub focus: usize,
 }
 
-impl LoginForm {
+impl AuthForm {
     pub fn new() -> Self {
         Self {
+            mode: AuthMode::Login,
             account: String::new(),
             password: String::new(),
-            field: LoginField::Account,
+            username: String::new(),
+            phone: String::new(),
+            email: String::new(),
+            captcha: String::new(),
+            focus: 0,
         }
     }
 
-    /// 当前焦点对应的可变文本。
-    fn active_buffer(&mut self) -> &mut String {
-        match self.field {
-            LoginField::Account => &mut self.account,
-            LoginField::Password => &mut self.password,
+    /// 当前模式下的字段标签。
+    pub fn labels(&self) -> &'static [&'static str] {
+        match self.mode {
+            AuthMode::Login => &LOGIN_LABELS,
+            AuthMode::Register => &REGISTER_LABELS,
         }
     }
 
-    pub fn active_text(&self) -> &str {
-        match self.field {
-            LoginField::Account => &self.account,
-            LoginField::Password => &self.password,
+    /// 按下标取字段值。
+    pub fn value(&self, index: usize) -> &str {
+        match (self.mode, index) {
+            (AuthMode::Login, 0) => &self.account,
+            (_, 1) => &self.password,
+            (AuthMode::Register, 0) => &self.username,
+            (AuthMode::Register, 2) => &self.phone,
+            (AuthMode::Register, 3) => &self.email,
+            (AuthMode::Register, 4) => &self.captcha,
+            _ => "",
         }
     }
 
-    fn insert(&mut self, ch: char) {
-        self.active_buffer().push(ch);
+    /// 该字段是否需要遮蔽显示（密码）。
+    pub fn masked(index: usize) -> bool {
+        index == 1
     }
 
-    fn backspace(&mut self) {
-        self.active_buffer().pop();
+    fn buffer_mut(&mut self, index: usize) -> Option<&mut String> {
+        match (self.mode, index) {
+            (AuthMode::Login, 0) => Some(&mut self.account),
+            (_, 1) => Some(&mut self.password),
+            (AuthMode::Register, 0) => Some(&mut self.username),
+            (AuthMode::Register, 2) => Some(&mut self.phone),
+            (AuthMode::Register, 3) => Some(&mut self.email),
+            (AuthMode::Register, 4) => Some(&mut self.captcha),
+            _ => None,
+        }
     }
 
-    fn next_field(&mut self) {
-        self.field = match self.field {
-            LoginField::Account => LoginField::Password,
-            LoginField::Password => LoginField::Account,
-        };
+    pub fn insert(&mut self, ch: char) {
+        if let Some(buffer) = self.buffer_mut(self.focus) {
+            buffer.push(ch);
+        }
+    }
+
+    pub fn backspace(&mut self) {
+        if let Some(buffer) = self.buffer_mut(self.focus) {
+            buffer.pop();
+        }
+    }
+
+    pub fn next_field(&mut self) {
+        let count = self.labels().len();
+        self.focus = (self.focus + 1) % count;
+    }
+
+    pub fn prev_field(&mut self) {
+        let count = self.labels().len();
+        self.focus = (self.focus + count - 1) % count;
+    }
+
+    /// 切换模式并重置焦点与临时输入。
+    pub fn set_mode(&mut self, mode: AuthMode) {
+        self.mode = mode;
+        self.focus = 0;
+    }
+
+    /// 清空密码与验证码，避免残留在界面上。
+    pub fn clear_sensitive(&mut self) {
+        self.password.clear();
+        self.captcha.clear();
     }
 }
 
-impl Default for LoginForm {
+impl Default for AuthForm {
     fn default() -> Self {
         Self::new()
     }
@@ -131,7 +195,7 @@ impl Default for LoginForm {
 
 /// 应用全局状态。
 pub struct App {
-    /// 内存数据（后续由持久化层加载 / 回写）。
+    /// 内存数据，变更后写回 JSON 文件。
     pub store: Store,
     pub session: Option<Session>,
     pub view: View,
@@ -139,24 +203,67 @@ pub struct App {
     pub status: StatusMessage,
     /// 工作台左侧菜单的选中下标。
     pub menu_index: usize,
-    pub login: LoginForm,
+    pub auth: AuthForm,
+    persistence: JsonFilePersistence,
 }
 
 impl App {
     pub fn new() -> Self {
+        let persistence = JsonFilePersistence::new(repo::default_data_path());
+
+        let (store, status) = match persistence.load() {
+            Ok(mut store) => {
+                // 单用户桌面程序，启动时清理上次遗留的会话。
+                store.sessions.clear();
+                let user_count = store.users.len();
+                (
+                    store,
+                    StatusMessage::info(format!(
+                        "已加载数据：{}（账号 {user_count} 个）",
+                        persistence.path.display()
+                    )),
+                )
+            }
+            Err(AppError::NotFound(_)) => {
+                let store = seed::demo_store();
+                let status = match persistence.save(&store) {
+                    Ok(()) => StatusMessage::info(
+                        "首次运行：已初始化演示数据，可用 admin / admin123 登录",
+                    ),
+                    Err(err) => {
+                        StatusMessage::error(format!("初始化数据文件失败：{err}"))
+                    }
+                };
+                (store, status)
+            }
+            Err(err) => (
+                seed::demo_store(),
+                StatusMessage::error(format!("读取数据失败：{err}；已使用临时演示数据")),
+            ),
+        };
+
         Self {
-            store: Store::new(),
+            store,
             session: None,
             view: View::Login,
             running: true,
-            status: StatusMessage::default(),
+            status,
             menu_index: 0,
-            login: LoginForm::new(),
+            auth: AuthForm::new(),
+            persistence,
         }
     }
 
-    /// 事件循环：重绘 → 等待按键 → 处理。
+    /// 事件循环：重绘 → 等待按键 → 处理，退出前兜底落盘。
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+        let result = self.event_loop(terminal);
+        if let Err(err) = self.persistence.save(&self.store) {
+            eprintln!("退出时保存数据失败：{err}");
+        }
+        result
+    }
+
+    fn event_loop(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while self.running {
             terminal.draw(|frame| tui::render(frame, self))?;
             self.tick()?;
@@ -183,38 +290,120 @@ impl App {
         }
 
         match self.view {
-            View::Login => self.on_login_key(key),
+            View::Login => self.on_auth_key(key),
             View::Workspace => self.on_workspace_key(key),
         }
     }
 
-    // ---------- 登录页 ----------
+    // ---------- 登录 / 注册 ----------
 
-    fn on_login_key(&mut self, key: KeyEvent) {
+    fn on_auth_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.running = false,
-            KeyCode::Tab | KeyCode::BackTab => self.login.next_field(),
-            KeyCode::Enter => self.submit_login(),
-            KeyCode::Backspace => self.login.backspace(),
+            KeyCode::Esc => self.on_auth_escape(),
+            KeyCode::Tab | KeyCode::Down => self.auth.next_field(),
+            KeyCode::BackTab | KeyCode::Up => self.auth.prev_field(),
+            KeyCode::Enter => self.submit_auth(),
+            KeyCode::Backspace => self.auth.backspace(),
+            KeyCode::F(2) => self.toggle_auth_mode(),
+            KeyCode::F(3) => self.request_captcha(),
             KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.login.insert(ch)
+                self.auth.insert(ch)
             }
-            // TODO(lab3): 骨架期临时入口，登录功能实现后删除。
-            KeyCode::F(1) => self.enter_demo(Role::Buyer),
-            KeyCode::F(2) => self.enter_demo(Role::Seller),
-            KeyCode::F(3) => self.enter_demo(Role::Admin),
             _ => {}
         }
     }
 
+    fn on_auth_escape(&mut self) {
+        if self.auth.mode == AuthMode::Register {
+            self.auth.set_mode(AuthMode::Login);
+            self.set_status(StatusMessage::info("已返回登录"));
+        } else {
+            self.running = false;
+        }
+    }
+
+    fn toggle_auth_mode(&mut self) {
+        let mode = match self.auth.mode {
+            AuthMode::Login => AuthMode::Register,
+            AuthMode::Register => AuthMode::Login,
+        };
+        self.auth.set_mode(mode);
+        self.auth.clear_sensitive();
+        let hint = match mode {
+            AuthMode::Login => "已切换到登录",
+            AuthMode::Register => "已切换到注册：填写手机号或邮箱后按 F3 获取验证码",
+        };
+        self.set_status(StatusMessage::info(hint));
+    }
+
+    fn submit_auth(&mut self) {
+        match self.auth.mode {
+            AuthMode::Login => self.submit_login(),
+            AuthMode::Register => self.submit_register(),
+        }
+    }
+
     fn submit_login(&mut self) {
-        match service::user::login(&mut self.store, &self.login.account, &self.login.password) {
+        let result = service::user::login(
+            &mut self.store,
+            &self.auth.account,
+            &self.auth.password,
+        );
+
+        match result {
             Ok(session) => {
-                self.login.password.clear();
+                self.auth.clear_sensitive();
                 self.enter_workspace(session);
             }
             Err(err) => self.set_status(StatusMessage::error(format!("登录失败：{err}"))),
         }
+        self.persist();
+    }
+
+    fn submit_register(&mut self) {
+        let request = service::user::RegisterRequest {
+            username: self.auth.username.trim().to_string(),
+            password: self.auth.password.clone(),
+            phone: Some(self.auth.phone.trim().to_string()).filter(|text| !text.is_empty()),
+            email: Some(self.auth.email.trim().to_string()).filter(|text| !text.is_empty()),
+            captcha: self.auth.captcha.trim().to_string(),
+        };
+
+        let result = service::user::register(&mut self.store, &request);
+        match result {
+            Ok(user) => {
+                let username = user.username.clone();
+                self.auth.set_mode(AuthMode::Login);
+                self.auth.account = username.clone();
+                self.auth.clear_sensitive();
+                self.set_status(StatusMessage::success(format!(
+                    "注册成功，请使用「{username}」登录"
+                )));
+            }
+            Err(err) => self.set_status(StatusMessage::error(format!("注册失败：{err}"))),
+        }
+        self.persist();
+    }
+
+    fn request_captcha(&mut self) {
+        if self.auth.mode != AuthMode::Register {
+            self.set_status(StatusMessage::info("请先按 F2 切换到注册"));
+            return;
+        }
+
+        let target = if !self.auth.phone.trim().is_empty() {
+            self.auth.phone.trim().to_string()
+        } else {
+            self.auth.email.trim().to_string()
+        };
+
+        match service::user::issue_captcha(&mut self.store, &target) {
+            Ok(code) => self.set_status(StatusMessage::success(format!(
+                "验证码：{code}（5 分钟内有效；演示环境不发送短信 / 邮件）"
+            ))),
+            Err(err) => self.set_status(StatusMessage::error(format!("获取验证码失败：{err}"))),
+        }
+        self.persist();
     }
 
     // ---------- 工作台 ----------
@@ -243,18 +432,20 @@ impl App {
                 }
             }
             KeyCode::Char('r') => self.switch_role(),
-            KeyCode::F(1) => self.enter_demo(Role::Buyer),
-            KeyCode::F(2) => self.enter_demo(Role::Seller),
-            KeyCode::F(3) => self.enter_demo(Role::Admin),
             _ => {}
         }
     }
 
     fn logout(&mut self) {
-        self.session = None;
+        if let Some(session) = self.session.take() {
+            let _ = service::user::logout(&mut self.store, &session.token);
+        }
         self.view = View::Login;
         self.menu_index = 0;
+        self.auth.set_mode(AuthMode::Login);
+        self.auth.clear_sensitive();
         self.set_status(StatusMessage::info("已退出登录"));
+        self.persist();
     }
 
     /// 在账号具备的多个角色之间切换（同一账号可同时是买家和卖家）。
@@ -277,38 +468,25 @@ impl App {
             session.role = next;
         }
         self.menu_index = 0;
-        self.set_status(StatusMessage::success(format!("已切换到{}视角", next.label())));
-    }
-
-    // ---------- 会话辅助 ----------
-
-    /// 骨架期的演示会话：直接注入一个账号进入对应工作台。
-    ///
-    /// TODO(lab3): 登录 / 注册实现后移除该入口。
-    fn enter_demo(&mut self, role: Role) {
-        let mut user = User::new(format!("demo_{}", role.key()), None, None, "demo");
-        user.buyer_role = true;
-        user.seller_role = true;
-        user.admin_role = matches!(role, Role::Admin);
-
-        let session = Session::new(user.user_id.clone(), role);
-        let username = user.username.clone();
-        self.store.users.push(user);
-        self.session = Some(session);
-        self.view = View::Workspace;
-        self.menu_index = 0;
-        self.set_status(StatusMessage::info(format!(
-            "演示会话已建立：{username}（{}），真实登录功能待实现",
-            role.label()
+        self.set_status(StatusMessage::success(format!(
+            "已切换到{}视角",
+            next.label()
         )));
     }
 
     fn enter_workspace(&mut self, session: Session) {
+        let greeting = self
+            .store
+            .user(&session.user_id)
+            .map(|user| user.username.clone())
+            .unwrap_or_default();
         self.session = Some(session);
         self.view = View::Workspace;
         self.menu_index = 0;
-        self.set_status(StatusMessage::success("登录成功"));
+        self.set_status(StatusMessage::success(format!("登录成功，欢迎回来 {greeting}")));
     }
+
+    // ---------- 会话辅助 ----------
 
     /// 当前登录用户。
     pub fn current_user(&self) -> Option<&User> {
@@ -344,6 +522,13 @@ impl App {
 
     pub fn set_status(&mut self, status: StatusMessage) {
         self.status = status;
+    }
+
+    /// 立即写回磁盘；失败时在状态栏提示（不中断当前操作）。
+    fn persist(&mut self) {
+        if let Err(err) = self.persistence.save(&self.store) {
+            self.status = StatusMessage::error(format!("数据保存失败：{err}"));
+        }
     }
 }
 

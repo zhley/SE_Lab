@@ -3,10 +3,11 @@
 use rust_decimal::Decimal;
 
 use crate::domain::audit::Appeal;
-use crate::domain::item::{Item, ItemStatus};
-use crate::error::Result;
+use crate::domain::item::{ALLOWED_TRANSITIONS, Item, ItemStatus};
+use crate::error::{AppError, Result};
 use crate::repo::Store;
 use crate::service::not_implemented;
+use crate::util;
 
 /// 新建商品时提交的内容。
 #[derive(Debug, Clone, Default)]
@@ -74,11 +75,45 @@ pub fn handle_appeal(
 }
 
 /// 状态转换统一入口：校验转换表 + 版本号（REQ-008、REQ-021）。
+///
+/// 版本号不一致说明用户看到的是旧页面，返回
+/// `StateConflict`，界面提示“状态已变化，请刷新”。
 pub fn change_status(
-    _store: &mut Store,
-    _item_id: &str,
-    _target: ItemStatus,
-    _version: u64,
+    store: &mut Store,
+    item_id: &str,
+    target: ItemStatus,
+    version: u64,
 ) -> Result<()> {
-    not_implemented("service::item::change_status")
+    let current = store
+        .item(item_id)
+        .ok_or_else(|| AppError::NotFound("商品不存在或已被删除".into()))?;
+    if current.version != version {
+        return Err(AppError::StateConflict(
+            "商品状态已变化，请刷新后重试".into(),
+        ));
+    }
+    force_status(store, item_id, target)
+}
+
+/// 内部状态转换：跳过版本号校验，用于审核、封禁等系统级联操作（REQ-008）。
+pub(crate) fn force_status(store: &mut Store, item_id: &str, target: ItemStatus) -> Result<()> {
+    let item = store
+        .item_mut(item_id)
+        .ok_or_else(|| AppError::NotFound("商品不存在或已被删除".into()))?;
+
+    if item.status == target {
+        return Ok(());
+    }
+    if !ALLOWED_TRANSITIONS.contains(&(item.status, target)) {
+        return Err(AppError::StateConflict(format!(
+            "商品不能从「{}」变更为「{}」",
+            item.status.label(),
+            target.label()
+        )));
+    }
+
+    item.status = target;
+    item.version += 1;
+    item.updated_at = util::now();
+    Ok(())
 }

@@ -32,9 +32,19 @@ pub struct NewLog<'a> {
     pub detail: &'a str,
 }
 
-/// 写入一条操作日志。
-pub fn record(_store: &mut Store, _entry: &NewLog<'_>) -> Result<()> {
-    not_implemented("service::log::record")
+/// 写入一条操作日志（只增不改，REQ-025）。
+pub fn record(store: &mut Store, entry: &NewLog<'_>) -> Result<()> {
+    let mut log = OperationLog::new(
+        entry.operator_id,
+        entry.role,
+        entry.action,
+        entry.target_type,
+        entry.target_id,
+        entry.result,
+    );
+    log.detail = entry.detail.to_string();
+    store.logs.push(log);
+    Ok(())
 }
 
 /// 按条件分页查询日志（时间倒序，仅管理员）。
