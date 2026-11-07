@@ -1,0 +1,27 @@
+//! 应用服务层：业务规则、权限校验与多对象协作。
+//!
+//! 约定：服务函数都是自由函数，第一个参数为 `&mut Store`（或 `&Store`），
+//! 便于单元测试直接构造数据、也避免多个服务互相持有引用。
+//!
+//! 每个 `*.rs` 对应一个业务模块：
+//!
+//! - [`user`]：注册、登录、锁定、封禁/解封
+//! - [`item`]：草稿、提交审核、审核、上下架、违规与申诉
+//! - [`trade`]：预约创建/确认/取消、交易完成与买家确认
+//! - [`query`]：多条件查询、可见范围、统计汇总
+//! - [`notice`]：站内通知生成、已读、未读数
+//! - [`log`]：关键操作日志写入与查询
+
+pub mod item;
+pub mod log;
+pub mod notice;
+pub mod query;
+pub mod trade;
+pub mod user;
+
+use crate::error::{AppError, Result};
+
+/// 骨架阶段的统一占位实现，实现具体逻辑时替换掉即可。
+pub(crate) fn not_implemented<T>(what: &'static str) -> Result<T> {
+    Err(AppError::NotImplemented(what))
+}
